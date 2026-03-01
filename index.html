@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Distributor Photos Gallery (Google Sheet)</title>
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+    body{
+      background: linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);
+      min-height:100vh;
+      padding:20px;
+    }
+    .container{
+      max-width:1300px;margin:0 auto;background:#fff;border-radius:15px;
+      box-shadow:0 10px 30px rgba(0,0,0,.1);overflow:hidden;
+    }
+    header{
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:#fff;padding:28px;text-align:center;
+    }
+    header h1{font-size:2.1rem;margin-bottom:8px}
+    header p{opacity:.9;font-size:1rem}
+
+    .toolbar{
+      padding:18px 22px;
+      display:flex;gap:12px;flex-wrap:wrap;
+      align-items:center;justify-content:space-between;
+      border-bottom:1px solid #eee;background:#fafbfc;
+    }
+    .toolbar .left{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .toolbar input{
+      padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;
+      font-size:1rem;min-width:260px;
+    }
+    .btn{
+      padding:10px 16px;border:none;border-radius:10px;cursor:pointer;
+      font-weight:700;transition:.25s;
+    }
+    .btn.primary{background:#667eea;color:#fff}
+    .btn.primary:hover{background:#5a6fd8}
+    .btn.warn{background:#ff9800;color:#fff}
+    .btn.warn:hover{background:#e68900}
+    .btn.ghost{background:#fff;border:2px solid #e0e0e0;color:#444}
+    .btn.ghost:hover{border-color:#cfcfcf}
+
+    .meta{font-size:.95rem;color:#555;opacity:.95}
+
+    .loading{padding:40px;text-align:center;color:#667eea;display:none}
+    .spinner{
+      border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;
+      width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 18px;
+    }
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+    .error{
+      display:none;margin:18px 22px;
+      color:#b00020;background:#ffebee;padding:14px;border-radius:10px;
+      border:1px solid #ffcdd2;
+      white-space:pre-line;
+    }
+
+    .grid{
+      padding:22px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:22px;
+    }
+
+    .card{
+      border:1px solid #eee;border-radius:14px;overflow:hidden;
+      box-shadow:0 5px 14px rgba(0,0,0,.07);
+      transition:transform .2s ease, box-shadow .2s ease;
+    }
+    .card:hover{transform:translateY(-3px);box-shadow:0 12px 22px rgba(0,0,0,.11)}
+
+    .cardHead{
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:#fff;padding:16px 18px;
+      display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+    }
+    .cardTitle{font-size:1.15rem;font-weight:800;line-height:1.2}
+    .cardSub{font-size:.95rem;opacity:.92;line-height:1.25}
+
+    /* 8 photos -> 4 per row */
+    .photos{
+      padding:16px 18px;
+      display:grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap:14px;
+      background:#fff;
+    }
+
+    .photoBox{
+      border:1px solid #f0f0f0;border-radius:12px;padding:12px;background:#fff;
+    }
+    .photoLabel{
+      font-weight:800;color:#764ba2;
+      padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid #f4f4f4;
+      font-size:.98rem;display:flex;gap:8px;align-items:center;
+    }
+    .photoLabel .dot{
+      width:10px;height:10px;border-radius:50%;
+      background:#764ba2;display:inline-block;opacity:.85
+    }
+
+    .imgWrap{
+      width:100%;
+      height:220px;
+      border-radius:12px;
+      background:#f8f9fa;
+      display:flex;align-items:center;justify-content:center;
+      overflow:hidden;
+      position:relative;
+    }
+    .imgWrap img{
+      max-width:100%;max-height:100%;
+      width:auto;height:auto;
+      object-fit:contain;
+      transition: transform .25s ease;
+      cursor:pointer; /* clickable */
+    }
+    .imgWrap:hover img{transform:scale(1.02)}
+    .noImg{
+      height:220px;border-radius:12px;background:#f8f9fa;
+      display:flex;align-items:center;justify-content:center;
+      color:#999;font-style:italic;text-align:center;padding:18px;
+    }
+
+    @media (max-width: 1150px){
+      .photos{grid-template-columns: repeat(2, minmax(220px, 1fr));}
+      .toolbar input{min-width:220px}
+    }
+    @media (max-width: 680px){
+      .photos{grid-template-columns: 1fr;}
+      .toolbar{justify-content:flex-start}
+      .toolbar input{width:100%}
+    }
+
+    /* =======================
+       FULLSCREEN IMAGE MODAL
+       ======================= */
+    .img-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 24px;
+    }
+    .img-modal.open { display: flex; }
+
+    .img-modal-inner{
+      position: relative;
+      width: min(1200px, 96vw);
+      height: min(92vh, 96vh);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .img-modal img{
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 14px;
+      box-shadow: 0 18px 55px rgba(0,0,0,.35);
+      cursor: zoom-in;
+      transition: transform .15s ease;
+      transform-origin: center center;
+      user-select: none;
+    }
+
+    .img-modal .close-btn{
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 900;
+      background: #fff;
+      color: #111;
+      box-shadow: 0 10px 24px rgba(0,0,0,.25);
+    }
+
+    .img-modal .hint{
+      position: absolute;
+      left: 10px;
+      bottom: -2px;
+      color: rgba(255,255,255,.85);
+      font-size: 13px;
+      user-select: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>Distributor Photos Gallery</h1>
+      <p>Live data from Google Sheet → Sheet: <b>Photos</b></p>
+    </header>
+
+    <div class="toolbar">
+      <div class="left">
+        <input id="q" type="text" placeholder="Filter by State / Hub / Spoke / Distributor..." />
+        <button class="btn primary" id="btnFilter">Filter</button>
+        <button class="btn warn" id="btnReset">Show All</button>
+        <button class="btn ghost" id="btnReload">Reload Sheet</button>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Fetching Google Sheet and loading images…</div>
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- Fullscreen modal -->
+  <div class="img-modal" id="imgModal" aria-hidden="true">
+    <div class="img-modal-inner">
+      <button class="close-btn" id="imgModalClose" title="Close (Esc)">✕</button>
+      <img id="imgModalImg" alt="Full screen view"/>
+      <div class="hint">Click image to zoom • Drag to pan (when zoomed) • Esc to close</div>
+    </div>
+  </div>
+
+  <script>
+    // ============================
+    // CONFIG
+    // ============================
+    const SHEET_ID = "1IxM80RQOyIPNBzDMv4DuS1V0fwn_LloQntSpavahglw";
+    const GID = "1712780841";                 // Photos tab gid
+    const SHEET_NAME = "Photos";              // for clarity (not required by endpoint)
+    const PLACEHOLDER = "https://via.placeholder.com/900x600/9e9e9e/ffffff?text=Image+Not+Available";
+
+    // Column names expected in the sheet (must match headers exactly)
+    const COLS = {
+      state: "State",
+      hub: "Hub",
+      spoke: "Spoke",
+      distributor: "Distributor_Name",
+      photos: [
+        { key: "Photo_Billboard_Link",      label: "Billboard" },
+        { key: "Photo_KYC_Link",            label: "KYC" },
+        { key: "Photo_GST_Link",            label: "GST" },
+        { key: "Photo_FSSAI_Link",          label: "FSSAI" },
+        { key: "Photo_Godown_Outside_Link", label: "Godown Outside" },
+        { key: "Photo_Godown_Inside_Link",  label: "Godown Inside" },
+        { key: "Photo_Vehicle_Link",        label: "Vehicle" },
+        { key: "Photo_Signoff_Link",        label: "Sign-off" }
+      ]
+    };
+
+    // ============================
+    // DOM
+    // ============================
+    const grid = document.getElementById("grid");
+    const loading = document.getElementById("loading");
+    const error = document.getElementById("error");
+    const meta = document.getElementById("meta");
+
+    const q = document.getElementById("q");
+    const btnFilter = document.getElementById("btnFilter");
+    const btnReset = document.getElementById("btnReset");
+    const btnReload = document.getElementById("btnReload");
+
+    // Fullscreen modal DOM
+    const imgModal = document.getElementById("imgModal");
+    const imgModalImg = document.getElementById("imgModalImg");
+    const imgModalClose = document.getElementById("imgModalClose");
+
+    // ============================
+    // STATE
+    // ============================
+    let rows = [];          // all data rows (objects)
+    let filtered = [];      // filtered rows
+
+    // Modal state
+    let zoom = 1;
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+
+    // ============================
+    // HELPERS
+    // ============================
+    function showLoading(on){ loading.style.display = on ? "block" : "none"; }
+    function showError(msg){
+      error.textContent = msg;
+      error.style.display = "block";
+    }
+    function clearError(){
+      error.style.display = "none";
+      error.textContent = "";
+    }
+
+    function convertDriveLink(driveLink) {
+      if (!driveLink || driveLink.toString().trim() === "") return null;
+
+      const link = driveLink.toString().trim();
+
+      // Already direct/thumbnail image URL
+      if (link.startsWith("http") && (link.includes("thumbnail?id=") || link.match(/\.(png|jpg|jpeg|webp)(\?.*)?$/i))) {
+        return link;
+      }
+
+      const patterns = [
+        /\/d\/([^\/]+)/,
+        /id=([^&]+)/,
+        /\/file\/d\/([^\/]+)/
+      ];
+
+      let fileId = null;
+      for (const pattern of patterns) {
+        const match = link.match(pattern);
+        if (match && match[1]) { fileId = match[1]; break; }
+      }
+      if (!fileId) return null;
+
+      // Big thumbnail (fast + shows full image)
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+    }
+
+    function normalizeCell(v){ return (v ?? "").toString().trim(); }
+
+    // Google Visualization JSON wrapper → extract table into array of objects
+    function parseGviz(text){
+      // gviz returns: "/*O_o*/\ngoogle.visualization.Query.setResponse({...});"
+      const match = text.match(/setResponse\(([\s\S]*?)\);\s*$/);
+      if (!match) throw new Error("GViz response format changed / not accessible.");
+
+      const json = JSON.parse(match[1]);
+      const table = json.table;
+      const cols = table.cols.map(c => (c.label || "").trim());
+      const out = [];
+
+      for (const r of (table.rows || [])) {
+        const obj = {};
+        (r.c || []).forEach((cell, idx) => {
+          const key = cols[idx] || `COL_${idx}`;
+          obj[key] = cell ? (cell.v ?? "") : "";
+        });
+        out.push(obj);
+      }
+      return out;
+    }
+
+    function escapeHtml(str){
+      return (str ?? "").toString()
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function escapeAttr(str){ return escapeHtml(str).replaceAll("\n"," "); }
+
+    function buildCard(row){
+      const state = normalizeCell(row[COLS.state]);
+      const hub = normalizeCell(row[COLS.hub]);
+      const spoke = normalizeCell(row[COLS.spoke]);
+      const distributor = normalizeCell(row[COLS.distributor]);
+
+      const headHtml = `
+        <div class="cardHead">
+          <div>
+            <div class="cardTitle">${escapeHtml(distributor || "Unknown Distributor")}</div>
+            <div class="cardSub">${escapeHtml(state)} | ${escapeHtml(hub)} | ${escapeHtml(spoke)}</div>
+          </div>
+        </div>
+      `;
+
+      // 8 photos -> 4 columns => auto 2 rows
+      const photosHtml = COLS.photos.map(p => {
+        const raw = row[p.key];
+        const url = convertDriveLink(raw);
+        return `
+          <div class="photoBox">
+            <div class="photoLabel"><span class="dot"></span> ${escapeHtml(p.label)}</div>
+            ${
+              url
+                ? `<div class="imgWrap">
+                     <img src="${url}" alt="${escapeAttr(p.label)}"
+                          onerror="this.onerror=null; this.src='${PLACEHOLDER}'">
+                   </div>`
+                : `<div class="noImg">Image not available</div>`
+            }
+          </div>
+        `;
+      }).join("");
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = headHtml + `<div class="photos">${photosHtml}</div>`;
+      return card;
+    }
+
+    function render(list){
+      grid.innerHTML = "";
+      meta.textContent = `Records: ${list.length}${rows.length ? ` / ${rows.length}` : ""}`;
+
+      if (!list.length){
+        grid.innerHTML = `
+          <div style="text-align:center;padding:30px;color:#666;">
+            <div style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">No matching distributors found</div>
+            <div>Change the keyword or click <b>Show All</b>.</div>
+          </div>
+        `;
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      list.forEach(r => frag.appendChild(buildCard(r)));
+      grid.appendChild(frag);
+    }
+
+    function applyFilter(){
+      const term = normalizeCell(q.value).toLowerCase();
+      if (!term){
+        filtered = [...rows];
+        render(filtered);
+        return;
+      }
+      filtered = rows.filter(r => {
+        const hay = [
+          r[COLS.state], r[COLS.hub], r[COLS.spoke], r[COLS.distributor]
+        ].map(x => normalizeCell(x).toLowerCase()).join(" | ");
+        return hay.includes(term);
+      });
+      render(filtered);
+    }
+
+    // ============================
+    // FULLSCREEN MODAL
+    // ============================
+    function openImgModal(src){
+      zoom = 1;
+      translateX = 0; translateY = 0;
+      imgModalImg.style.transform = `translate(0px,0px) scale(1)`;
+      imgModalImg.style.cursor = "zoom-in";
+
+      imgModalImg.src = src;
+      imgModal.classList.add("open");
+      imgModal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeImgModal(){
+      imgModal.classList.remove("open");
+      imgModal.setAttribute("aria-hidden", "true");
+      imgModalImg.src = "";
+      document.body.style.overflow = "";
+    }
+
+    // Event delegation: click any gallery image -> modal
+    document.addEventListener("click", (e) => {
+      const img = e.target.closest(".imgWrap img");
+      if (!img) return;
+      openImgModal(img.src);
+    });
+
+    // Close by backdrop click
+    imgModal.addEventListener("click", (e) => {
+      if (e.target === imgModal) closeImgModal();
+    });
+
+    imgModalClose.addEventListener("click", closeImgModal);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && imgModal.classList.contains("open")) closeImgModal();
+    });
+
+    // Toggle zoom on modal image click
+    imgModalImg.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      if (zoom === 1){
+        zoom = 2;
+        imgModalImg.style.cursor = "grab";
+      } else {
+        zoom = 1;
+        translateX = 0; translateY = 0;
+        imgModalImg.style.cursor = "zoom-in";
+      }
+      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+    });
+
+    // Drag-to-pan when zoomed (desktop)
+    imgModalImg.addEventListener("mousedown", (e) => {
+      if (zoom === 1) return;
+      isDragging = true;
+      imgModalImg.style.cursor = "grabbing";
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+      e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!isDragging) return;
+      isDragging = false;
+      imgModalImg.style.cursor = "grab";
+    });
+
+    // Drag-to-pan (mobile)
+    imgModalImg.addEventListener("touchstart", (e) => {
+      if (zoom === 1) return;
+      isDragging = true;
+      const t = e.touches[0];
+      startX = t.clientX - translateX;
+      startY = t.clientY - translateY;
+    }, {passive:true});
+
+    imgModalImg.addEventListener("touchmove", (e) => {
+      if (!isDragging) return;
+      const t = e.touches[0];
+      translateX = t.clientX - startX;
+      translateY = t.clientY - startY;
+      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+    }, {passive:true});
+
+    imgModalImg.addEventListener("touchend", () => {
+      if (!isDragging) return;
+      isDragging = false;
+    });
+
+    // ============================
+    // FETCH SHEET
+    // ============================
+    async function loadSheet(){
+      clearError();
+      showLoading(true);
+      grid.innerHTML = "";
+      meta.textContent = "";
+
+      try{
+        // Works only if the sheet is shared as "Anyone with the link can view"
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json&headers=1`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status} while fetching sheet.`);
+
+        const text = await res.text();
+        const data = parseGviz(text);
+
+        // schema check
+        const required = [COLS.state, COLS.hub, COLS.spoke, COLS.distributor, ...COLS.photos.map(p => p.key)];
+        const missing = required.filter(k => !(k in (data[0] || {})));
+        if (missing.length){
+          throw new Error(
+            `Sheet headers mismatch. Missing columns: ${missing.join(", ")}.\n` +
+            `Fix header names in Google Sheet tab "${SHEET_NAME}" (must match exactly).`
+          );
+        }
+
+        // Keep only rows with distributor name
+        rows = data.filter(r => normalizeCell(r[COLS.distributor]) !== "");
+        filtered = [...rows];
+
+        showLoading(false);
+        render(filtered);
+      }catch(e){
+        showLoading(false);
+        showError(
+          `Failed to load Google Sheet.\n${e.message}\n\n` +
+          `Hard requirement: the sheet must be shared as "Anyone with the link can view".`
+        );
+      }
+    }
+
+    // ============================
+    // EVENTS
+    // ============================
+    btnFilter.addEventListener("click", applyFilter);
+    btnReset.addEventListener("click", () => { q.value=""; applyFilter(); });
+    btnReload.addEventListener("click", loadSheet);
+    q.addEventListener("keypress", (e) => { if (e.key === "Enter") applyFilter(); });
+
+    // Init
+    loadSheet();
+  </script>
+</body>
+</html>
