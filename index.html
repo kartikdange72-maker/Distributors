@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Distributor Photos Gallery (Google Sheet)</title>
+  <title>Distributor Photos · smart type filter</title>
 
   <style>
     *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
@@ -29,11 +29,16 @@
       align-items:center;justify-content:space-between;
       border-bottom:1px solid #eee;background:#fafbfc;
     }
-    .toolbar .left{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .toolbar input{
-      padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;
-      font-size:1rem;min-width:260px;
+    .toolbar .left{
+      display:flex;gap:10px;flex-wrap:wrap;align-items:center;
     }
+    .toolbar input, .toolbar select{
+      padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;
+      font-size:1rem;background:white;
+    }
+    .toolbar input{min-width:240px;}
+    .toolbar select{min-width:170px;cursor:pointer;}
+
     .btn{
       padding:10px 16px;border:none;border-radius:10px;cursor:pointer;
       font-weight:700;transition:.25s;
@@ -44,6 +49,17 @@
     .btn.warn:hover{background:#e68900}
     .btn.ghost{background:#fff;border:2px solid #e0e0e0;color:#444}
     .btn.ghost:hover{border-color:#cfcfcf}
+
+    .filter-badge{
+      display:inline-block;
+      background:#e8eaf6;
+      border-radius:30px;
+      padding:5px 15px;
+      font-size:.9rem;
+      font-weight:600;
+      color:#1a237e;
+      border:1px solid #c5cae9;
+    }
 
     .meta{font-size:.95rem;color:#555;opacity:.95}
 
@@ -61,12 +77,7 @@
       white-space:pre-line;
     }
 
-    .grid{
-      padding:22px;
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:22px;
-    }
+    .grid{padding:22px;display:grid;grid-template-columns:1fr;gap:22px;}
 
     .card{
       border:1px solid #eee;border-radius:14px;overflow:hidden;
@@ -83,11 +94,10 @@
     .cardTitle{font-size:1.15rem;font-weight:800;line-height:1.2}
     .cardSub{font-size:.95rem;opacity:.92;line-height:1.25}
 
-    /* 8 photos -> 4 per row */
     .photos{
       padding:16px 18px;
       display:grid;
-      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      grid-template-columns: repeat(4, minmax(200px, 1fr));
       gap:14px;
       background:#fff;
     }
@@ -95,6 +105,12 @@
     .photoBox{
       border:1px solid #f0f0f0;border-radius:12px;padding:12px;background:#fff;
     }
+    
+    /* class to hide photo boxes when filtering */
+    .photoBox.filtered-out {
+      display: none;
+    }
+    
     .photoLabel{
       font-weight:800;color:#764ba2;
       padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid #f4f4f4;
@@ -119,7 +135,7 @@
       width:auto;height:auto;
       object-fit:contain;
       transition: transform .25s ease;
-      cursor:pointer; /* clickable */
+      cursor:pointer;
     }
     .imgWrap:hover img{transform:scale(1.02)}
     .noImg{
@@ -129,18 +145,15 @@
     }
 
     @media (max-width: 1150px){
-      .photos{grid-template-columns: repeat(2, minmax(220px, 1fr));}
-      .toolbar input{min-width:220px}
+      .photos{grid-template-columns: repeat(2, minmax(200px, 1fr));}
     }
     @media (max-width: 680px){
       .photos{grid-template-columns: 1fr;}
-      .toolbar{justify-content:flex-start}
-      .toolbar input{width:100%}
+      .toolbar .left{flex-direction:column;align-items:stretch;}
+      .toolbar input,.toolbar select{width:100%;}
     }
 
-    /* =======================
-       FULLSCREEN IMAGE MODAL
-       ======================= */
+    /* Fullscreen modal */
     .img-modal {
       position: fixed;
       inset: 0;
@@ -191,7 +204,6 @@
       color: #111;
       box-shadow: 0 10px 24px rgba(0,0,0,.25);
     }
-
     .img-modal .hint{
       position: absolute;
       left: 10px;
@@ -202,23 +214,37 @@
     }
   </style>
 </head>
-
 <body>
   <div class="container">
     <header>
-      <h1>Distributor Photos Gallery</h1>
-      <p>Live data from Google Sheet → Sheet: <b>Photos</b></p>
+      <h1>Distributor Photos · show only selected type</h1>
+      <p>Sheet: <b>Photos</b> — when you select a type, ONLY that photo appears</p>
     </header>
 
     <div class="toolbar">
       <div class="left">
         <input id="q" type="text" placeholder="Filter by State / Hub / Spoke / Distributor..." />
-        <button class="btn primary" id="btnFilter">Filter</button>
+        <!-- dropdown for all photo types -->
+        <select id="photoTypeSelect">
+          <option value="all">📸 Show all photo types</option>
+          <option value="Billboard">📢 Show only Billboard</option>
+          <option value="KYC">📋 Show only KYC</option>
+          <option value="GST">🏷️ Show only GST</option>
+          <option value="FSSAI">🔬 Show only FSSAI</option>
+          <option value="Godown Outside">🏢 Show only Godown Outside</option>
+          <option value="Godown Inside">🏭 Show only Godown Inside</option>
+          <option value="Vehicle">🚚 Show only Vehicle</option>
+          <option value="Sign-off">📝 Show only Sign-off</option>
+        </select>
+
+        <button class="btn primary" id="btnFilter">🔍 Apply</button>
         <button class="btn warn" id="btnReset">Show All</button>
-        <button class="btn ghost" id="btnReload">Reload Sheet</button>
+        <button class="btn ghost" id="btnReload">⟳ Reload Sheet</button>
       </div>
       <div class="meta" id="meta"></div>
     </div>
+
+    <div style="padding:0 22px 10px 22px;"><span id="activeFilterChip" class="filter-badge" style="display:none;"></span></div>
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
@@ -235,369 +261,402 @@
     <div class="img-modal-inner">
       <button class="close-btn" id="imgModalClose" title="Close (Esc)">✕</button>
       <img id="imgModalImg" alt="Full screen view"/>
-      <div class="hint">Click image to zoom • Drag to pan (when zoomed) • Esc to close</div>
+      <div class="hint">Click image to zoom • Drag to pan • Esc to close</div>
     </div>
   </div>
 
   <script>
-    // ============================
-    // CONFIG
-    // ============================
-    const SHEET_ID = "1IxM80RQOyIPNBzDMv4DuS1V0fwn_LloQntSpavahglw";
-    const GID = "1712780841";                 // Photos tab gid
-    const SHEET_NAME = "Photos";              // for clarity (not required by endpoint)
-    const PLACEHOLDER = "https://via.placeholder.com/900x600/9e9e9e/ffffff?text=Image+Not+Available";
+    (function(){
+      // ========================= CONFIG =========================
+      const SHEET_ID = "1IxM80RQOyIPNBzDMv4DuS1V0fwn_LloQntSpavahglw";
+      const GID = "1712780841";                 // Photos tab gid
+      const PLACEHOLDER = "https://via.placeholder.com/900x600/9e9e9e/ffffff?text=Image+Not+Available";
 
-    // Column names expected in the sheet (must match headers exactly)
-    const COLS = {
-      state: "State",
-      hub: "Hub",
-      spoke: "Spoke",
-      distributor: "Distributor_Name",
-      photos: [
-        { key: "Photo_Billboard_Link",      label: "Billboard" },
-        { key: "Photo_KYC_Link",            label: "KYC" },
-        { key: "Photo_GST_Link",            label: "GST" },
-        { key: "Photo_FSSAI_Link",          label: "FSSAI" },
-        { key: "Photo_Godown_Outside_Link", label: "Godown Outside" },
-        { key: "Photo_Godown_Inside_Link",  label: "Godown Inside" },
-        { key: "Photo_Vehicle_Link",        label: "Vehicle" },
-        { key: "Photo_Signoff_Link",        label: "Sign-off" }
-      ]
-    };
+      // Column names expected in the sheet (must match exactly)
+      const COLS = {
+        state: "State",
+        hub: "Hub",
+        spoke: "Spoke",
+        distributor: "Distributor_Name",
+        photos: [
+          { key: "Photo_Billboard_Link",      label: "Billboard" },
+          { key: "Photo_KYC_Link",            label: "KYC" },
+          { key: "Photo_GST_Link",            label: "GST" },
+          { key: "Photo_FSSAI_Link",          label: "FSSAI" },
+          { key: "Photo_Godown_Outside_Link", label: "Godown Outside" },
+          { key: "Photo_Godown_Inside_Link",  label: "Godown Inside" },
+          { key: "Photo_Vehicle_Link",        label: "Vehicle" },
+          { key: "Photo_Signoff_Link",        label: "Sign-off" }
+        ]
+      };
 
-    // ============================
-    // DOM
-    // ============================
-    const grid = document.getElementById("grid");
-    const loading = document.getElementById("loading");
-    const error = document.getElementById("error");
-    const meta = document.getElementById("meta");
+      // DOM elements
+      const grid = document.getElementById("grid");
+      const loading = document.getElementById("loading");
+      const error = document.getElementById("error");
+      const meta = document.getElementById("meta");
+      const q = document.getElementById("q");
+      const photoTypeSelect = document.getElementById("photoTypeSelect");
+      const btnFilter = document.getElementById("btnFilter");
+      const btnReset = document.getElementById("btnReset");
+      const btnReload = document.getElementById("btnReload");
+      const activeFilterChip = document.getElementById("activeFilterChip");
 
-    const q = document.getElementById("q");
-    const btnFilter = document.getElementById("btnFilter");
-    const btnReset = document.getElementById("btnReset");
-    const btnReload = document.getElementById("btnReload");
+      // Fullscreen modal
+      const imgModal = document.getElementById("imgModal");
+      const imgModalImg = document.getElementById("imgModalImg");
+      const imgModalClose = document.getElementById("imgModalClose");
 
-    // Fullscreen modal DOM
-    const imgModal = document.getElementById("imgModal");
-    const imgModalImg = document.getElementById("imgModalImg");
-    const imgModalClose = document.getElementById("imgModalClose");
+      // State
+      let rows = [];                // all data rows (objects)
+      let currentFilterType = 'all'; // 'all' or specific label
+      let currentTextFilter = '';
 
-    // ============================
-    // STATE
-    // ============================
-    let rows = [];          // all data rows (objects)
-    let filtered = [];      // filtered rows
+      // Modal drag/zoom state
+      let zoom = 1;
+      let isDragging = false;
+      let startX = 0, startY = 0;
+      let translateX = 0, translateY = 0;
 
-    // Modal state
-    let zoom = 1;
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let translateX = 0, translateY = 0;
-
-    // ============================
-    // HELPERS
-    // ============================
-    function showLoading(on){ loading.style.display = on ? "block" : "none"; }
-    function showError(msg){
-      error.textContent = msg;
-      error.style.display = "block";
-    }
-    function clearError(){
-      error.style.display = "none";
-      error.textContent = "";
-    }
-
-    function convertDriveLink(driveLink) {
-      if (!driveLink || driveLink.toString().trim() === "") return null;
-
-      const link = driveLink.toString().trim();
-
-      // Already direct/thumbnail image URL
-      if (link.startsWith("http") && (link.includes("thumbnail?id=") || link.match(/\.(png|jpg|jpeg|webp)(\?.*)?$/i))) {
-        return link;
+      // ====================== HELPER FUNCTIONS ======================
+      function showLoading(on){ loading.style.display = on ? "block" : "none"; }
+      function showError(msg){
+        error.textContent = msg;
+        error.style.display = "block";
+      }
+      function clearError(){
+        error.style.display = "none";
+        error.textContent = "";
       }
 
-      const patterns = [
-        /\/d\/([^\/]+)/,
-        /id=([^&]+)/,
-        /\/file\/d\/([^\/]+)/
-      ];
+      function normalizeCell(v){ return (v ?? "").toString().trim(); }
 
-      let fileId = null;
-      for (const pattern of patterns) {
-        const match = link.match(pattern);
-        if (match && match[1]) { fileId = match[1]; break; }
-      }
-      if (!fileId) return null;
+      // Convert google drive link to thumbnail
+      function convertDriveLink(driveLink) {
+        if (!driveLink || driveLink.toString().trim() === "") return null;
+        const link = driveLink.toString().trim();
 
-      // Big thumbnail (fast + shows full image)
-      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
-    }
-
-    function normalizeCell(v){ return (v ?? "").toString().trim(); }
-
-    // Google Visualization JSON wrapper → extract table into array of objects
-    function parseGviz(text){
-      // gviz returns: "/*O_o*/\ngoogle.visualization.Query.setResponse({...});"
-      const match = text.match(/setResponse\(([\s\S]*?)\);\s*$/);
-      if (!match) throw new Error("GViz response format changed / not accessible.");
-
-      const json = JSON.parse(match[1]);
-      const table = json.table;
-      const cols = table.cols.map(c => (c.label || "").trim());
-      const out = [];
-
-      for (const r of (table.rows || [])) {
-        const obj = {};
-        (r.c || []).forEach((cell, idx) => {
-          const key = cols[idx] || `COL_${idx}`;
-          obj[key] = cell ? (cell.v ?? "") : "";
-        });
-        out.push(obj);
-      }
-      return out;
-    }
-
-    function escapeHtml(str){
-      return (str ?? "").toString()
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-    function escapeAttr(str){ return escapeHtml(str).replaceAll("\n"," "); }
-
-    function buildCard(row){
-      const state = normalizeCell(row[COLS.state]);
-      const hub = normalizeCell(row[COLS.hub]);
-      const spoke = normalizeCell(row[COLS.spoke]);
-      const distributor = normalizeCell(row[COLS.distributor]);
-
-      const headHtml = `
-        <div class="cardHead">
-          <div>
-            <div class="cardTitle">${escapeHtml(distributor || "Unknown Distributor")}</div>
-            <div class="cardSub">${escapeHtml(state)} | ${escapeHtml(hub)} | ${escapeHtml(spoke)}</div>
-          </div>
-        </div>
-      `;
-
-      // 8 photos -> 4 columns => auto 2 rows
-      const photosHtml = COLS.photos.map(p => {
-        const raw = row[p.key];
-        const url = convertDriveLink(raw);
-        return `
-          <div class="photoBox">
-            <div class="photoLabel"><span class="dot"></span> ${escapeHtml(p.label)}</div>
-            ${
-              url
-                ? `<div class="imgWrap">
-                     <img src="${url}" alt="${escapeAttr(p.label)}"
-                          onerror="this.onerror=null; this.src='${PLACEHOLDER}'">
-                   </div>`
-                : `<div class="noImg">Image not available</div>`
-            }
-          </div>
-        `;
-      }).join("");
-
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = headHtml + `<div class="photos">${photosHtml}</div>`;
-      return card;
-    }
-
-    function render(list){
-      grid.innerHTML = "";
-      meta.textContent = `Records: ${list.length}${rows.length ? ` / ${rows.length}` : ""}`;
-
-      if (!list.length){
-        grid.innerHTML = `
-          <div style="text-align:center;padding:30px;color:#666;">
-            <div style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">No matching distributors found</div>
-            <div>Change the keyword or click <b>Show All</b>.</div>
-          </div>
-        `;
-        return;
-      }
-
-      const frag = document.createDocumentFragment();
-      list.forEach(r => frag.appendChild(buildCard(r)));
-      grid.appendChild(frag);
-    }
-
-    function applyFilter(){
-      const term = normalizeCell(q.value).toLowerCase();
-      if (!term){
-        filtered = [...rows];
-        render(filtered);
-        return;
-      }
-      filtered = rows.filter(r => {
-        const hay = [
-          r[COLS.state], r[COLS.hub], r[COLS.spoke], r[COLS.distributor]
-        ].map(x => normalizeCell(x).toLowerCase()).join(" | ");
-        return hay.includes(term);
-      });
-      render(filtered);
-    }
-
-    // ============================
-    // FULLSCREEN MODAL
-    // ============================
-    function openImgModal(src){
-      zoom = 1;
-      translateX = 0; translateY = 0;
-      imgModalImg.style.transform = `translate(0px,0px) scale(1)`;
-      imgModalImg.style.cursor = "zoom-in";
-
-      imgModalImg.src = src;
-      imgModal.classList.add("open");
-      imgModal.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-    }
-
-    function closeImgModal(){
-      imgModal.classList.remove("open");
-      imgModal.setAttribute("aria-hidden", "true");
-      imgModalImg.src = "";
-      document.body.style.overflow = "";
-    }
-
-    // Event delegation: click any gallery image -> modal
-    document.addEventListener("click", (e) => {
-      const img = e.target.closest(".imgWrap img");
-      if (!img) return;
-      openImgModal(img.src);
-    });
-
-    // Close by backdrop click
-    imgModal.addEventListener("click", (e) => {
-      if (e.target === imgModal) closeImgModal();
-    });
-
-    imgModalClose.addEventListener("click", closeImgModal);
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && imgModal.classList.contains("open")) closeImgModal();
-    });
-
-    // Toggle zoom on modal image click
-    imgModalImg.addEventListener("click", (e) => {
-      e.stopPropagation();
-
-      if (zoom === 1){
-        zoom = 2;
-        imgModalImg.style.cursor = "grab";
-      } else {
-        zoom = 1;
-        translateX = 0; translateY = 0;
-        imgModalImg.style.cursor = "zoom-in";
-      }
-      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
-    });
-
-    // Drag-to-pan when zoomed (desktop)
-    imgModalImg.addEventListener("mousedown", (e) => {
-      if (zoom === 1) return;
-      isDragging = true;
-      imgModalImg.style.cursor = "grabbing";
-      startX = e.clientX - translateX;
-      startY = e.clientY - translateY;
-      e.preventDefault();
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      translateX = e.clientX - startX;
-      translateY = e.clientY - startY;
-      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
-    });
-
-    window.addEventListener("mouseup", () => {
-      if (!isDragging) return;
-      isDragging = false;
-      imgModalImg.style.cursor = "grab";
-    });
-
-    // Drag-to-pan (mobile)
-    imgModalImg.addEventListener("touchstart", (e) => {
-      if (zoom === 1) return;
-      isDragging = true;
-      const t = e.touches[0];
-      startX = t.clientX - translateX;
-      startY = t.clientY - translateY;
-    }, {passive:true});
-
-    imgModalImg.addEventListener("touchmove", (e) => {
-      if (!isDragging) return;
-      const t = e.touches[0];
-      translateX = t.clientX - startX;
-      translateY = t.clientY - startY;
-      imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
-    }, {passive:true});
-
-    imgModalImg.addEventListener("touchend", () => {
-      if (!isDragging) return;
-      isDragging = false;
-    });
-
-    // ============================
-    // FETCH SHEET
-    // ============================
-    async function loadSheet(){
-      clearError();
-      showLoading(true);
-      grid.innerHTML = "";
-      meta.textContent = "";
-
-      try{
-        // Works only if the sheet is shared as "Anyone with the link can view"
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json&headers=1`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status} while fetching sheet.`);
-
-        const text = await res.text();
-        const data = parseGviz(text);
-
-        // schema check
-        const required = [COLS.state, COLS.hub, COLS.spoke, COLS.distributor, ...COLS.photos.map(p => p.key)];
-        const missing = required.filter(k => !(k in (data[0] || {})));
-        if (missing.length){
-          throw new Error(
-            `Sheet headers mismatch. Missing columns: ${missing.join(", ")}.\n` +
-            `Fix header names in Google Sheet tab "${SHEET_NAME}" (must match exactly).`
-          );
+        if (link.startsWith("http") && (link.includes("thumbnail?id=") || link.match(/\.(png|jpg|jpeg|webp)(\?.*)?$/i))) {
+          return link;
         }
 
-        // Keep only rows with distributor name
-        rows = data.filter(r => normalizeCell(r[COLS.distributor]) !== "");
-        filtered = [...rows];
+        const patterns = [
+          /\/d\/([^\/]+)/,
+          /id=([^&]+)/,
+          /\/file\/d\/([^\/]+)/
+        ];
 
-        showLoading(false);
-        render(filtered);
-      }catch(e){
-        showLoading(false);
-        showError(
-          `Failed to load Google Sheet.\n${e.message}\n\n` +
-          `Hard requirement: the sheet must be shared as "Anyone with the link can view".`
-        );
+        let fileId = null;
+        for (const pattern of patterns) {
+          const match = link.match(pattern);
+          if (match && match[1]) { fileId = match[1]; break; }
+        }
+        if (!fileId) return null;
+
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
       }
-    }
 
-    // ============================
-    // EVENTS
-    // ============================
-    btnFilter.addEventListener("click", applyFilter);
-    btnReset.addEventListener("click", () => { q.value=""; applyFilter(); });
-    btnReload.addEventListener("click", loadSheet);
-    q.addEventListener("keypress", (e) => { if (e.key === "Enter") applyFilter(); });
+      // parse Google Visualization API response
+      function parseGviz(text){
+        const match = text.match(/setResponse\(([\s\S]*?)\);\s*$/);
+        if (!match) throw new Error("GViz response format changed / not accessible.");
 
-    // Init
-    loadSheet();
+        const json = JSON.parse(match[1]);
+        const table = json.table;
+        const cols = table.cols.map(c => (c.label || "").trim());
+        const out = [];
+
+        for (const r of (table.rows || [])) {
+          const obj = {};
+          (r.c || []).forEach((cell, idx) => {
+            const key = cols[idx] || `COL_${idx}`;
+            obj[key] = cell ? (cell.v ?? "") : "";
+          });
+          out.push(obj);
+        }
+        return out;
+      }
+
+      function escapeHtml(str){
+        return (str ?? "").toString()
+          .replaceAll("&","&amp;")
+          .replaceAll("<","&lt;")
+          .replaceAll(">","&gt;")
+          .replaceAll('"',"&quot;")
+          .replaceAll("'","&#039;");
+      }
+      function escapeAttr(str){ return escapeHtml(str).replaceAll("\n"," "); }
+
+      // Check if a distributor matches text filter
+      function distributorMatchesText(row, term) {
+        if (!term) return true;
+        const hay = [
+          row[COLS.state], row[COLS.hub], row[COLS.spoke], row[COLS.distributor]
+        ].map(x => normalizeCell(x).toLowerCase()).join(" | ");
+        return hay.includes(term);
+      }
+
+      // Check if a specific photo exists for a row
+      function hasPhoto(row, label) {
+        const photoDef = COLS.photos.find(p => p.label === label);
+        if (!photoDef) return false;
+        const link = row[photoDef.key];
+        return link && normalizeCell(link) !== "";
+      }
+
+      // Build card with conditional photo visibility
+      function buildCard(row, activeType) {
+        const state = normalizeCell(row[COLS.state]);
+        const hub = normalizeCell(row[COLS.hub]);
+        const spoke = normalizeCell(row[COLS.spoke]);
+        const distributor = normalizeCell(row[COLS.distributor]);
+
+        const headHtml = `
+          <div class="cardHead">
+            <div>
+              <div class="cardTitle">${escapeHtml(distributor || "Unknown Distributor")}</div>
+              <div class="cardSub">${escapeHtml(state)} | ${escapeHtml(hub)} | ${escapeHtml(spoke)}</div>
+            </div>
+          </div>
+        `;
+
+        // Build each photo box with conditional class
+        const photosHtml = COLS.photos.map(p => {
+          const raw = row[p.key];
+          const url = convertDriveLink(raw);
+          const hasImage = !!url;
+          
+          // Determine if this photo box should be visible
+          let hideClass = '';
+          if (activeType !== 'all' && p.label !== activeType) {
+            hideClass = 'filtered-out';  // hide if filter active and not matching type
+          }
+          
+          // If no image and we're showing only this type, we might still want to show "not available"
+          // But for now, we'll show the box (it will show "Image not available")
+          
+          return `
+            <div class="photoBox ${hideClass}">
+              <div class="photoLabel"><span class="dot"></span> ${escapeHtml(p.label)}</div>
+              ${
+                url
+                  ? `<div class="imgWrap">
+                       <img src="${url}" alt="${escapeAttr(p.label)}"
+                            onerror="this.onerror=null; this.src='${PLACEHOLDER}'">
+                     </div>`
+                  : `<div class="noImg">Image not available</div>`
+              }
+            </div>
+          `;
+        }).join("");
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = headHtml + `<div class="photos">${photosHtml}</div>`;
+        return card;
+      }
+
+      // Main render function
+      function render() {
+        const textTerm = normalizeCell(q.value).toLowerCase();
+        const selectedType = photoTypeSelect.value;
+        
+        // Filter distributors based on text and type
+        let visibleRows = rows.filter(row => {
+          // Text filter
+          if (!distributorMatchesText(row, textTerm)) return false;
+          
+          // Type filter - if not 'all', distributor must have this photo
+          if (selectedType !== 'all') {
+            return hasPhoto(row, selectedType);
+          }
+          return true;
+        });
+
+        // Update meta
+        meta.textContent = `Records: ${visibleRows.length}${rows.length ? ` / ${rows.length}` : ""}`;
+
+        // Update chip
+        if (selectedType === 'all') {
+          activeFilterChip.style.display = 'none';
+        } else {
+          activeFilterChip.style.display = 'inline-block';
+          activeFilterChip.textContent = `📷 Showing only: ${selectedType}`;
+        }
+
+        // Render grid
+        grid.innerHTML = "";
+        
+        if (!visibleRows.length) {
+          grid.innerHTML = `
+            <div style="text-align:center;padding:30px;color:#666;">
+              <div style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">No matching distributors</div>
+              <div>Change filter or click <b>Show All</b>.</div>
+            </div>
+          `;
+          return;
+        }
+
+        const frag = document.createDocumentFragment();
+        visibleRows.forEach(row => {
+          // Pass the selected type to buildCard so it knows which photos to show/hide
+          frag.appendChild(buildCard(row, selectedType));
+        });
+        grid.appendChild(frag);
+      }
+
+      // ====================== FULLSCREEN MODAL ======================
+      function openImgModal(src){
+        zoom = 1;
+        translateX = 0; translateY = 0;
+        imgModalImg.style.transform = `translate(0px,0px) scale(1)`;
+        imgModalImg.style.cursor = "zoom-in";
+        imgModalImg.src = src;
+        imgModal.classList.add("open");
+        imgModal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeImgModal(){
+        imgModal.classList.remove("open");
+        imgModal.setAttribute("aria-hidden", "true");
+        imgModalImg.src = "";
+        document.body.style.overflow = "";
+      }
+
+      // delegate click on gallery images
+      document.addEventListener("click", (e) => {
+        const img = e.target.closest(".imgWrap img");
+        if (!img) return;
+        openImgModal(img.src);
+      });
+
+      imgModal.addEventListener("click", (e) => {
+        if (e.target === imgModal) closeImgModal();
+      });
+
+      imgModalClose.addEventListener("click", closeImgModal);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && imgModal.classList.contains("open")) closeImgModal();
+      });
+
+      // zoom and drag logic
+      imgModalImg.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (zoom === 1){
+          zoom = 2;
+          imgModalImg.style.cursor = "grab";
+        } else {
+          zoom = 1;
+          translateX = 0; translateY = 0;
+          imgModalImg.style.cursor = "zoom-in";
+        }
+        imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+      });
+
+      imgModalImg.addEventListener("mousedown", (e) => {
+        if (zoom === 1) return;
+        isDragging = true;
+        imgModalImg.style.cursor = "grabbing";
+        startX = e.clientX - translateX;
+        startY = e.clientY - translateY;
+        e.preventDefault();
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        translateX = e.clientX - startX;
+        translateY = e.clientY - startY;
+        imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+      });
+
+      window.addEventListener("mouseup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        imgModalImg.style.cursor = "grab";
+      });
+
+      imgModalImg.addEventListener("touchstart", (e) => {
+        if (zoom === 1) return;
+        isDragging = true;
+        const t = e.touches[0];
+        startX = t.clientX - translateX;
+        startY = t.clientY - translateY;
+      }, {passive:true});
+
+      imgModalImg.addEventListener("touchmove", (e) => {
+        if (!isDragging) return;
+        const t = e.touches[0];
+        translateX = t.clientX - startX;
+        translateY = t.clientY - startY;
+        imgModalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoom})`;
+      }, {passive:true});
+
+      imgModalImg.addEventListener("touchend", () => {
+        if (!isDragging) return;
+        isDragging = false;
+      });
+
+      // ====================== SHEET LOAD ======================
+      async function loadSheet(){
+        clearError();
+        showLoading(true);
+        grid.innerHTML = "";
+        meta.textContent = "";
+
+        try{
+          const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json&headers=1`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status} while fetching sheet.`);
+
+          const text = await res.text();
+          const data = parseGviz(text);
+
+          // schema check
+          const required = [COLS.state, COLS.hub, COLS.spoke, COLS.distributor, ...COLS.photos.map(p => p.key)];
+          const missing = required.filter(k => !(k in (data[0] || {})));
+          if (missing.length){
+            throw new Error(
+              `Sheet headers mismatch. Missing columns: ${missing.join(", ")}.\n` +
+              `Fix header names in Google Sheet tab "Photos".`
+            );
+          }
+
+          rows = data.filter(r => normalizeCell(r[COLS.distributor]) !== "");
+          // reset filters
+          q.value = '';
+          photoTypeSelect.value = 'all';
+          activeFilterChip.style.display = 'none';
+          
+          showLoading(false);
+          render();
+        }catch(e){
+          showLoading(false);
+          showError(`Failed to load Google Sheet.\n${e.message}\n\nMake sure sheet is shared as "Anyone with the link can view".`);
+        }
+      }
+
+      // ====================== EVENT LISTENERS ======================
+      btnFilter.addEventListener("click", render);
+      btnReset.addEventListener("click", () => {
+        q.value = "";
+        photoTypeSelect.value = 'all';
+        activeFilterChip.style.display = 'none';
+        render();
+      });
+
+      btnReload.addEventListener("click", loadSheet);
+
+      // Enter key in text field triggers filter
+      q.addEventListener("keypress", (e) => { if (e.key === "Enter") render(); });
+
+      // Also filter when dropdown changes (optional - you can uncomment if you want instant updates)
+      // photoTypeSelect.addEventListener("change", render);
+
+      // initial load
+      loadSheet();
+    })();
   </script>
 </body>
 </html>
